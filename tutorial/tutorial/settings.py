@@ -39,7 +39,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
-    'snippets'
+    # 웹 api를 위한 app 생성
+    'snippets',
+
+    'django_extensions'
 ]
 
 MIDDLEWARE = [
