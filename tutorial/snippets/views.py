@@ -3,15 +3,14 @@ from django.shortcuts import render
 
 # Create your views here.
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework import status
+from rest_framework.decorators import api_view
 from rest_framework.parsers import JSONParser
 from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
 
 from snippets.models import Snippet
 from snippets.serializers import SnippetSerializer
-
-
-def index(request):
-    return render(request, 'index.html')
 
 
 # serializer 사용하는 (일반적인) django view
@@ -26,44 +25,46 @@ class JSONResponse(HttpResponse):
 
 # 만들 api의 최상단에서 저장된 코드 조각을 모두 보여주거나, 새 코드 조각을 만들 수 있음
 # csrf_exempt 데코레이터: 인증되지 않은 사용자도 이 뷰에 post하도록 함
-@csrf_exempt
-def snippet_list(request):
+
+# upgrade! json뿐만 아니라 다른 콘텐츠 형태에 대한 요청이나 응답도 할 수 있도록 함
+# 함수 기반 뷰에서 @api_view 데코레이터 사용
+@api_view(['GET', 'POST'])
+# format 키워드 추가
+def snippet_list(request, format=None):
     if request.method == 'GET':
         snippets = Snippet.objects.all()
         serializer = SnippetSerializer(snippets, many=True)
-        return JSONResponse(serializer.data)
+        return Response(serializer.data)
 
     elif request.method == 'POST':
-        data = JSONParser().parse(request)
-        serializer = SnippetSerializer(data=data)
+        serializer = SnippetSerializer(data=request.data)
 
         if serializer.is_valid():
             serializer.save()
-            return JSONResponse(serializer.data, status=201)
-        return JSONResponse(serializer.errors, status=400)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # 코드 조각 하나를 보여줄 뷰
 # 코드 조각을 업데이트 혹은 삭제
-@csrf_exempt
-def snippet_detail(request, pk):
+@api_view(['GET', 'PUT', 'DELETE'])
+def snippet_detail(request, pk, format=None):
     try:
         snippet = Snippet.objects.get(pk=pk)
     except Snippet.DoesNotExist:
-        return HttpResponse(status=404)
+        return Response(status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
         serializer = SnippetSerializer(snippet)
-        return JSONResponse(serializer.data)
+        return Response(serializer.data)
 
     elif request.method == 'PUT':
-        data = JSONParser().parse(request)
-        serializer = SnippetSerializer(snippet, data=data)
+        serializer = SnippetSerializer(snippet, data=request.data)
 
         if serializer.is_valid():
             serializer.save()
-            return JSONResponse(serializer.errors, status=400)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         snippet.delete()
-        return HttpResponse(status=204)
+        return Response(status=status.HTTP_204_NO_CONTENT)
